@@ -100,10 +100,12 @@ public abstract class AbstractContext implements Context {
         if (null != obj) {
             // Context
             if (obj instanceof Context) {
-                for (String key : ((Context) obj).keys()) {
-                    if (null != prefix)
-                        key = prefix + key;
-                    this.set(key, ((Context) obj).get(key));
+                Context ctx = (Context) obj;
+                for (String key : ctx.keys()) {
+                    if (null == prefix)
+                        this.set(key, ctx.get(key));
+                    else
+                        this.set(prefix + key, ctx.get(key));
                 }
             }
             // Map
@@ -158,6 +160,11 @@ public abstract class AbstractContext implements Context {
     @SuppressWarnings("unchecked")
     public List<Object> getList(String name) {
         return getAs(List.class, name);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> List<T> getList(Class<T> classOfT, String name) {
+        return (List<T>) getList(name);
     }
 
     public abstract AbstractContext clone();

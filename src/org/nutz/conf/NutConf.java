@@ -1,24 +1,19 @@
 package org.nutz.conf;
 
-import java.io.File;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.nutz.el.opt.custom.CustomMake;
 import org.nutz.json.Json;
-import org.nutz.lang.Files;
+import org.nutz.lang.Lang;
 import org.nutz.lang.util.NutType;
 import org.nutz.log.Log;
 import org.nutz.log.Logs;
 import org.nutz.mapl.Mapl;
 import org.nutz.resource.NutResource;
 import org.nutz.resource.Scans;
-import org.nutz.resource.impl.FileResource;
 
 /**
  * 配置加载器<br/>
@@ -43,19 +38,18 @@ public class NutConf {
 
     // 所有的配置信息
     private Map<String, Object> map = new HashMap<String, Object>();
-    private static final Lock lock = new ReentrantLock();
 
-    private static NutConf conf;
+    // zozoh 单利的话，没必要用这个吧 ...
+    // private static final Lock lock = new ReentrantLock();
+
+    private volatile static NutConf conf;
 
     private static NutConf me() {
-        lock.lock();
-        try{
-            if (null == conf) {
+        if (null == conf) {
+            synchronized (NutConf.class) {
                 if (null == conf)
                     conf = new NutConf();
             }
-        } finally{
-            lock.unlock();
         }
         return conf;
     }
@@ -67,7 +61,7 @@ public class NutConf {
 
     public static void load(String... paths) {
         me().loadResource(paths);
-        CustomMake.init();
+        CustomMake.me().init();
     }
 
     /**
@@ -76,14 +70,7 @@ public class NutConf {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void loadResource(String... paths) {
         for (String path : paths) {
-            List<NutResource> resources;
-            if (path.endsWith(".js")) {
-                File f = Files.findFile(path);
-                resources = new ArrayList<NutResource>();
-                resources.add(new FileResource(f));
-            } else {
-                resources = Scans.me().scan(path, "\\.js$");
-            }
+            List<NutResource> resources = Scans.me().scan(path, "\\.(js|json)$");
 
             for (NutResource nr : resources) {
                 try {
@@ -138,11 +125,18 @@ public class NutConf {
         }
         return Mapl.maplistToObj(map.get(key), type);
     }
-    
+
     /**
      * 清理所有配置信息
      */
-    public static void clear(){
+    public static void clear() {
         conf = null;
     }
+    
+    public static boolean USE_FASTCLASS = !Lang.isAndroid && Lang.JdkTool.getMajorVersion() <= 8;
+    public static boolean USE_MIRROR_CACHE = true;
+    public static boolean USE_EL_IN_OBJECT_CONVERT = false;
+    public static boolean RESOURCE_SCAN_TRACE = false;
+    public static boolean JSON_ALLOW_ILLEGAL_ESCAPE = true;
+    public static boolean JSON_APPEND_ILLEGAL_ESCAPE = false;
 }

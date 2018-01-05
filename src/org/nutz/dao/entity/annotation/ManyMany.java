@@ -37,10 +37,10 @@ import java.lang.annotation.Target;
 @Documented
 public @interface ManyMany {
 
-	/**
-	 * 关联类
-	 */
-    Class<?> target();
+    /**
+     * 关联类
+     */
+    Class<?> target() default Object.class;
 
     /**
      * 中间表的名称
@@ -48,17 +48,32 @@ public @interface ManyMany {
     String relation();
 
     /**
-     * 关联表中哪个字段代表主对象
+     * 关联表中哪个字段代表主对象, 如果你想指定 java 字段的名字，可以用冒号分隔 即
+     * 
+     * <pre>
+     * uid:userId
+     * </pre>
+     * 
+     * 来指定宿主对象的 "userId" 字段对应数据表的 "uid" 字段。
+     * 如果没有 ":"，则宿主 Java 字段需要与数据表字段同名
      */
     String from();
 
     /**
-     * 关联表中哪个字段代表 target 对象
+     * 关联表中哪个字段代表 target 对象, 如果你想指定 java 字段的名字，可以用冒号分隔 即
+     * 
+     * <pre>
+     * pid:petId
+     * </pre>
+     * 
+     * 来指定 target 对象的 "petId" 字段对应数据表的 "pid" 字段。
+     * 如果没有 ":"，则 target 对象 Java 字段需要与数据表字段同名
+     * 
      */
     String to();
 
     /**
-     * 指定关联类的一个属性名,缺省情况下,按参考字段名{@link #field()}的类型选取@Id或者@Name等主键字段
+     * 指定关联类的一个属性名,缺省情况下,按参考字段名{@link #from()}的类型选取@Id或者@Name等主键字段
      */
     String key() default "";
 

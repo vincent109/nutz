@@ -64,6 +64,8 @@ public interface Node<T> {
     boolean isFirst();
 
     List<Node<T>> getAncestors();
+    
+    List<Node<T>> parents();
 
     int depth();
 
@@ -90,4 +92,8 @@ public interface Node<T> {
     Iterator<Node<T>> iterator();
 
     <E extends Node<T>> void eachChild(Each<E> callback);
+    
+    String toString(int level);
+    
+    void toXml(StringBuilder sb, int level);
 }

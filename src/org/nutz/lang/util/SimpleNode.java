@@ -74,6 +74,16 @@ public class SimpleNode<T> implements Node<T> {
         return null == prev;
     }
 
+    public List<Node<T>> parents() {
+        LinkedList<Node<T>> list = new LinkedList<Node<T>>();
+        Node<T> me = parent;
+        while (me != null) {
+            list.addFirst(me);
+            me = me.parent();
+        }
+        return list;
+    }
+
     public List<Node<T>> getAncestors() {
         List<Node<T>> list = new LinkedList<Node<T>>();
         Node<T> me = parent;
@@ -420,4 +430,13 @@ public class SimpleNode<T> implements Node<T> {
         return new InnerIterator<T>(this);
     }
 
+    @Override
+    public String toString(int level) {
+        return toString();
+    }
+    
+    @Override
+    public void toXml(StringBuilder sb, int level) {
+        sb.append(toString(level));
+    }
 }
