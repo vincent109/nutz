@@ -13,6 +13,7 @@ import java.util.Map.Entry;
 
 import javax.sql.DataSource;
 
+import org.nutz.conf.NutConf;
 import org.nutz.dao.DB;
 import org.nutz.dao.DaoException;
 import org.nutz.dao.entity.Entity;
@@ -46,6 +47,7 @@ import org.nutz.dao.impl.entity.info.TableInfo;
 import org.nutz.dao.impl.entity.info._Infos;
 import org.nutz.dao.impl.entity.macro.ElFieldMacro;
 import org.nutz.dao.impl.entity.macro.SqlFieldMacro;
+import org.nutz.dao.interceptor.PojoInterceptor;
 import org.nutz.dao.jdbc.JdbcExpert;
 import org.nutz.dao.jdbc.Jdbcs;
 import org.nutz.dao.sql.Pojo;
@@ -324,6 +326,12 @@ public class AnnotationEntityMaker implements EntityMaker {
 			holder.remove(en);
 			throw Lang.wrapThrow(e);
 		}
+        // 处理Pojo拦截器
+        if (NutConf.DAO_USE_POJO_INTERCEPTOR && ti.annTable != null) {
+            PojoInterceptor pint = Mirror.me(ti.annTable.interceptor()).born();
+            pint.setupEntity(en, expert);
+            en.setInterceptor(pint);
+        }
 
         // 搞定收工，哦耶 ^_^
         en.setComplete(true);
@@ -442,7 +450,7 @@ public class AnnotationEntityMaker implements EntityMaker {
             // 用 @PK 的方式声明的主键
             if (info.annPK.value().length == 1) {
                 if (Lang.contains(info.annPK.value(), info.name)) {
-                    if (ef.getTypeMirror().isIntLike())
+                    if (ef.getMirror().isIntLike())
                         ef.setAsId();
                     else
                         ef.setAsName();
@@ -514,10 +522,10 @@ public class AnnotationEntityMaker implements EntityMaker {
             ef.setColumnName(ef.getColumnName().toUpperCase());
         }
         if (Daos.FORCE_WRAP_COLUMN_NAME || (info.annColumn != null && info.annColumn.wrap())) {
-            ef.setColumnNameInSql(expert.wrapKeywork(columnName, true));
+            ef.setColumnNameInSql(expert.wrapKeyword(columnName, true));
         }
         else if (Daos.CHECK_COLUMN_NAME_KEYWORD) {
-            ef.setColumnNameInSql(expert.wrapKeywork(columnName, false));
+            ef.setColumnNameInSql(expert.wrapKeyword(columnName, false));
         }
     }
 
@@ -586,6 +594,16 @@ public class AnnotationEntityMaker implements EntityMaker {
                 }
                 index.addField(ef);
             }
+            en.addIndex(index);
+        }
+        for (Field field : en.getMirror().getFields()) {
+            Index idx = field.getAnnotation(Index.class);
+            if (idx == null)
+                continue;
+            NutEntityIndex index = new NutEntityIndex();
+            index.setUnique(idx.unique());
+            index.setName(idx.name());
+            index.addField(en.getField(field.getName()));
             en.addIndex(index);
         }
     }

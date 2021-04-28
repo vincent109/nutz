@@ -14,6 +14,7 @@ import java.io.PrintStream;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.Writer;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
@@ -25,6 +26,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.nio.charset.Charset;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -44,6 +46,9 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.HttpServletRequest;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.ParserConfigurationException;
@@ -59,6 +64,7 @@ import org.nutz.lang.stream.StringWriter;
 import org.nutz.lang.util.Context;
 import org.nutz.lang.util.NutMap;
 import org.nutz.lang.util.NutType;
+import org.nutz.lang.util.Regex;
 import org.nutz.lang.util.SimpleContext;
 
 /**
@@ -1183,12 +1189,13 @@ public abstract class Lang {
             }
 
             if (null != v) {
-                //Class<?> ft = field.getType();
-                //获取泛型基类中的字段真实类型, https://github.com/nutzam/nutz/issues/1288
+                // Class<?> ft = field.getType();
+                // 获取泛型基类中的字段真实类型, https://github.com/nutzam/nutz/issues/1288
                 Class<?> ft = ReflectTool.getGenericFieldType(toType, field);
                 Object vv = null;
                 // 集合
-                if (v instanceof Collection) {
+                if (v instanceof Collection
+                    && (ft.isArray() || Collection.class.isAssignableFrom(ft))) {
                     Collection c = (Collection) v;
                     // 集合到数组
                     if (ft.isArray()) {
@@ -1198,9 +1205,10 @@ public abstract class Lang {
                     else {
                         // 创建
                         Collection newCol;
-                        //Class eleType = Mirror.getGenericTypes(field, 0);
+                        // Class eleType = Mirror.getGenericTypes(field, 0);
                         Class<?> eleType = ReflectTool.getParameterRealGenericClass(toType,
-                                field.getGenericType(),0);
+                                                                                    field.getGenericType(),
+                                                                                    0);
                         if (ft == List.class) {
                             newCol = new ArrayList(c.size());
                         } else if (ft == Set.class) {
@@ -1238,12 +1246,15 @@ public abstract class Lang {
                         }
                     }
                     // 赋值
-                    //final Class<?> valType = Mirror.getGenericTypes(field, 1);
-                    //map的key和value字段类型
+                    // final Class<?> valType = Mirror.getGenericTypes(field,
+                    // 1);
+                    // map的key和value字段类型
                     final Class<?> keyType = ReflectTool.getParameterRealGenericClass(toType,
-                            field.getGenericType(),0);
-                    final Class<?> valType =ReflectTool.getParameterRealGenericClass(toType,
-                            field.getGenericType(),1);
+                                                                                      field.getGenericType(),
+                                                                                      0);
+                    final Class<?> valType = ReflectTool.getParameterRealGenericClass(toType,
+                                                                                      field.getGenericType(),
+                                                                                      1);
                     each(v, new Each<Entry>() {
                         public void invoke(int i, Entry en, int length) {
                             map.put(Castors.me().castTo(en.getKey(), keyType),
@@ -1361,6 +1372,17 @@ public abstract class Lang {
      */
     public static Context context() {
         return new SimpleContext();
+    }
+
+    /**
+     * 根据key,val创建一个新的上下文对象
+     * 
+     * @param key
+     * @param val
+     * @return
+     */
+    public static Context context(String key, Object val) {
+        return context().set(key, val);
     }
 
     /**
@@ -1539,7 +1561,7 @@ public abstract class Lang {
     /**
      * 继续 each 循环，如果再递归，则停止递归
      */
-    public static void Continue() throws ExitLoop {
+    public static void Continue() throws ContinueLoop {
         throw new ContinueLoop();
     }
 
@@ -2390,6 +2412,10 @@ public abstract class Lang {
      * @return 数字签名
      */
     public static String digest(String algorithm, InputStream ins) {
+        return fixedHexString(digest2(algorithm, ins));
+    }
+    
+    public static byte[] digest2(String algorithm, InputStream ins) {
         try {
             MessageDigest md = MessageDigest.getInstance(algorithm);
 
@@ -2399,19 +2425,53 @@ public abstract class Lang {
                 md.update(bs, 0, len);
             }
 
-            byte[] hashBytes = md.digest();
-
-            return fixedHexString(hashBytes);
+            return md.digest();
         }
         catch (NoSuchAlgorithmException e) {
-            throw Lang.wrapThrow(e);
-        }
-        catch (FileNotFoundException e) {
             throw Lang.wrapThrow(e);
         }
         catch (IOException e) {
             throw Lang.wrapThrow(e);
         }
+        finally {
+            Streams.safeClose(ins);
+        }
+    }
+    
+    public static String digest(String algorithm, InputStream ins, byte[] keyBytes) {
+        return fixedHexString(digest2(algorithm, ins, keyBytes));
+    }
+    
+    public static String digest(String algorithm, File f, byte[] keyBytes) {
+        return fixedHexString(digest2(algorithm, Streams.fileIn(f), keyBytes));
+    }
+    
+    public static String digest(String algorithm, String str, byte[] keyBytes) {
+        return fixedHexString(digest2(algorithm, Streams.wrap(str.getBytes()), keyBytes));
+    }
+    
+    public static byte[] digest2(String algorithm, InputStream ins, byte[] keyBytes) {
+        try {
+            SecretKeySpec signingKey = new SecretKeySpec(keyBytes, "Hmac" + algorithm);
+            Mac mac = Mac.getInstance("Hmac" + algorithm);
+            mac.init(signingKey);
+
+            byte[] bs = new byte[HASH_BUFF_SIZE];
+            int len = 0;
+            while ((len = ins.read(bs)) != -1) {
+                mac.update(bs, 0, len);
+            }
+
+            return mac.doFinal();
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw Lang.wrapThrow(e);
+        }
+        catch (IOException e) {
+            throw Lang.wrapThrow(e);
+        } catch (InvalidKeyException e) {
+        	throw Lang.wrapThrow(e);
+		}
         finally {
             Streams.safeClose(ins);
         }
@@ -2595,8 +2655,8 @@ public abstract class Lang {
         if (source == null || source.isEmpty())
             return dst;
 
-        Pattern includePattern = include == null ? null : Pattern.compile(include);
-        Pattern excludePattern = exclude == null ? null : Pattern.compile(exclude);
+        Pattern includePattern = include == null ? null : Regex.getPattern(include);
+        Pattern excludePattern = exclude == null ? null : Regex.getPattern(exclude);
 
         for (Entry<String, Object> en : source.entrySet()) {
             String key = en.getKey();
@@ -2688,8 +2748,8 @@ public abstract class Lang {
             throw new IllegalArgumentException("origin is null");
         if (target == null)
             throw new IllegalArgumentException("target is null");
-        Pattern at = active == null ? null : Pattern.compile(active);
-        Pattern lo = lock == null ? null : Pattern.compile(lock);
+        Pattern at = active == null ? null : Regex.getPattern(active);
+        Pattern lo = lock == null ? null : Regex.getPattern(lock);
         Mirror<Object> originMirror = Mirror.me(origin);
         Mirror<T> targetMirror = Mirror.me(target);
         Field[] fields = targetMirror.getFields();
@@ -2787,12 +2847,13 @@ public abstract class Lang {
             return null;
         }
     }
-    
+
     public static class JdkTool {
         public static String getVersionLong() {
             Properties sys = System.getProperties();
             return sys.getProperty("java.version");
         }
+
         public static int getMajorVersion() {
             String ver = getVersionLong();
             if (Strings.isBlank(ver))
@@ -2805,11 +2866,135 @@ public abstract class Lang {
                 return t;
             return Integer.parseInt(tmp[1]);
         }
+
         public static boolean isEarlyAccess() {
             String ver = getVersionLong();
             if (Strings.isBlank(ver))
                 return false;
             return ver.contains("-ea");
         }
+
+        /**
+         * 获取进程id
+         * 
+         * @param fallback
+         *            如果获取失败,返回什么呢?
+         * @return 进程id
+         */
+        public static String getProcessId(final String fallback) {
+            final String jvmName = ManagementFactory.getRuntimeMXBean().getName();
+            final int index = jvmName.indexOf('@');
+            if (index < 1) {
+                return fallback;
+            }
+            try {
+                return Long.toString(Long.parseLong(jvmName.substring(0, index)));
+            }
+            catch (NumberFormatException e) {}
+            return fallback;
+        }
     }
+
+    /**
+     * 判断一个对象是否不为空。它支持如下对象类型：
+     * <ul>
+     * <li>null : 一定为空
+     * <li>数组
+     * <li>集合
+     * <li>Map
+     * <li>其他对象 : 一定不为空
+     * </ul>
+     *
+     * @param obj
+     *            任意对象
+     * @return 是否为空
+     */
+    public static boolean isNotEmpty(Object obj) {
+        return !isEmpty(obj);
+    }
+
+    /**
+     * 获取指定字符串的 HmacMD5 值
+     *
+     * @param data
+     *            字符串
+     * @param secret
+     *            密钥
+     * @return 指定字符串的 HmacMD5 值
+     */
+    public static String hmacmd5(String data, String secret) {
+        if (isEmpty(data))
+            throw new NullPointerException("data is null");
+        if (isEmpty(secret))
+            throw new NullPointerException("secret is null");
+        byte[] bytes = null;
+        try {
+            SecretKey secretKey = new SecretKeySpec(secret.getBytes(Encoding.UTF8), "HmacMD5");
+            Mac mac = Mac.getInstance(secretKey.getAlgorithm());
+            mac.init(secretKey);
+            bytes = mac.doFinal(data.getBytes(Encoding.UTF8));
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw Lang.wrapThrow(e);
+        }
+        return fixedHexString(bytes);
+    }
+
+    /**
+     * 获取指定字符串的 HmacSHA256 值
+     *
+     * @param data
+     *            字符串
+     * @param secret
+     *            密钥
+     * @return 指定字符串的 HmacSHA256 值
+     */
+    public static String hmacSHA256(String data, String secret) {
+        if (isEmpty(data))
+            throw new NullPointerException("data is null");
+        if (isEmpty(secret))
+            throw new NullPointerException("secret is null");
+        byte[] bytes = null;
+        try {
+            SecretKey secretKey = new SecretKeySpec(secret.getBytes(Encoding.UTF8), "HmacSHA256");
+            Mac mac = Mac.getInstance(secretKey.getAlgorithm());
+            mac.init(secretKey);
+            bytes = mac.doFinal(data.getBytes(Encoding.UTF8));
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw Lang.wrapThrow(e);
+        }
+        return fixedHexString(bytes);
+    }
+    
+    /**
+     * 获取指定字符串的 HmacSHA256 值
+    *
+    * @param data
+    *            字符串
+    * @param secret
+    *            密钥
+    * @return 指定字符串的 HmacSHA256 值
+    */
+   public static String hmacSHA1(String data, String secret) {
+       if (isEmpty(data))
+           throw new NullPointerException("data is null");
+       if (isEmpty(secret))
+           throw new NullPointerException("secret is null");
+       byte[] bytes = null;
+       try {
+           SecretKey secretKey = new SecretKeySpec(secret.getBytes(Encoding.UTF8), "HmacSHA1");
+           Mac mac = Mac.getInstance(secretKey.getAlgorithm());
+           mac.init(secretKey);
+           bytes = mac.doFinal(data.getBytes(Encoding.UTF8));
+       }
+       catch (Exception e) {
+           e.printStackTrace();
+           throw Lang.wrapThrow(e);
+       }
+       return fixedHexString(bytes);
+   }
+    
 }

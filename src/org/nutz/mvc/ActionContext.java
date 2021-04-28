@@ -1,13 +1,19 @@
 package org.nutz.mvc;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletContext;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.nutz.ioc.Ioc;
+import org.nutz.json.Json;
+import org.nutz.json.JsonFormat;
 import org.nutz.lang.util.SimpleContext;
 
 /**
@@ -35,6 +41,8 @@ public class ActionContext extends SimpleContext {
     private static final String ERROR = "nutz.mvc.error";
 
     public static final String AC_DONE = "nutz.mvc.done";
+    
+    public static final String REFER_OBJECT = "nutz.mvc.refer_object";
 
     /**
      * 获取全局的Ioc对象
@@ -108,6 +116,11 @@ public class ActionContext extends SimpleContext {
     }
 
     public ActionContext setPathArgs(List<String> args) {
+        this.set(PATH_ARGS, args);
+        return this;
+    }
+
+    public ActionContext setNamedPathArgs(Map<String, Object> args) {
         this.set(PATH_ARGS, args);
         return this;
     }
@@ -212,8 +225,34 @@ public class ActionContext extends SimpleContext {
         this.set(SERVLET_CONTEXT, sc);
         return this;
     }
+    
+    public ActionContext setReferObject(Object value) {
+        this.set(REFER_OBJECT, value);
+        return this;
+    }
+    
+    public Object getReferObject() {
+        return get(REFER_OBJECT);
+    }
+    
+    protected Map<String, Object> getSafeMap() {
+        Map<String, Object> map = new HashMap<String, Object>();
+        for (Map.Entry<String, Object> en : getInnerMap().entrySet()) {
+            Object value = en.getValue();
+            if (value != null) {
+                if (value instanceof ServletRequest || value instanceof ServletResponse || value instanceof ServletContext || value instanceof Ioc)
+                    continue;
+                map.put(en.getKey(), value);
+            }
+        }
+        return map;
+    }
+    
+    public String toJson(JsonFormat jf) {
+        return Json.toJson(getSafeMap(), jf);
+    }
 
     public String toString() {
-        return getInnerMap().toString();
+        return getSafeMap().toString();
     }
 }

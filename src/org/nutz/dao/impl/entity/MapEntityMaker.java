@@ -76,16 +76,14 @@ public class MapEntityMaker {
             // 强制大写?
             if (Daos.FORCE_UPPER_COLUMN_NAME) {
                 ef.setColumnName(columnName.toUpperCase());
-            }
-            else {
-            	ef.setColumnName(columnName);
+            } else {
+                ef.setColumnName(columnName);
             }
             // 强制包裹?
             if (Daos.FORCE_WRAP_COLUMN_NAME) {
-                ef.setColumnNameInSql(expert.wrapKeywork(columnName, true));
-            }
-            else if (Daos.CHECK_COLUMN_NAME_KEYWORD) {
-                ef.setColumnNameInSql(expert.wrapKeywork(columnName, false));
+                ef.setColumnNameInSql(expert.wrapKeyword(columnName, true));
+            } else if (Daos.CHECK_COLUMN_NAME_KEYWORD) {
+                ef.setColumnNameInSql(expert.wrapKeyword(columnName, false));
             }
 
             // 类型是啥呢?
@@ -106,6 +104,14 @@ public class MapEntityMaker {
                 ef.setAdaptor((ValueAdaptor) map.get("." + key + ".adaptor"));
             } else {
                 ef.setAdaptor(expert.getAdaptor(ef));
+            }
+
+            // 字段长度是多少呢
+            if (map.containsKey("." + key + ".width")) {
+                Object w = map.get("." + key + ".width");
+                if (null != w && (w instanceof Integer)) {
+                    ef.setWidth((Integer) w);
+                }
             }
             ef.setInjecting(new InjectToMap(key)); // 这里比较纠结,回设的时候应该用什么呢?
             ef.setEjecting(new EjectFromMap(entry.getKey()));

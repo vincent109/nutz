@@ -14,10 +14,12 @@ public class HttpTest {
     public void testGet() {
         Response response = Http.get("http://nutztest.herokuapp.com/");
         assertNotNull(response);
+        assertNotNull(response.getContent("UTF-8"));
+        assertNotNull(response.getContent());
         assertNotNull(response.getContent());
         assertNotNull(response.getDetail());
         assertNotNull(response.getHeader());
-        assertNotNull(response.getProtocal());
+        assertNotNull(response.getProtocol());
         assertTrue(response.getStatus() > 0);
         assertNotNull(response.getStream());
     }
@@ -59,6 +61,12 @@ public class HttpTest {
     @Test
     public void test_https() {
         Response response = Http.get("https://nutz.cn");
+        assertTrue(response.getStatus() == 200);
+    }
+
+    @Test
+    public void test_http_req() {
+        Response response = Http.httpReq("https://nutz.cn",Request.METHOD.GET,null,null,5000, Sender.Default_Conn_Timeout);
         assertTrue(response.getStatus() == 200);
     }
 

@@ -12,6 +12,29 @@ import org.nutz.lang.util.NutMap;
 public class TmplTest {
 
     @Test
+    public void test_dft_true_false() {
+        NutMap context = Lang.map("a", true);
+        assertEquals("x", Tmpl.exec("${a<boolean:x>}", context));
+        assertEquals("", Tmpl.exec("${a<boolean:x/>}", context));
+        assertEquals("y", Tmpl.exec("${a<boolean:x/y>}", context));
+        assertEquals("x", Tmpl.exec("${a<boolean:/x>}", context));
+    }
+
+    @Test
+    public void test_string_replace() {
+        NutMap context = Lang.map("path:'  ~/a/b/c  '");
+        assertEquals("-a-b-c",
+                     Tmpl.exec("${path<:@trim;@replace'/','-';@replace'~'>}", context, true));
+    }
+
+    @Test
+    public void test_string_mapping() {
+        NutMap context = Lang.map("fruit:'A'");
+        assertEquals("Apple", Tmpl.exec("${fruit(::A=Apple,B=Banana,C=Cherry)}", context, true));
+        assertEquals("Apple", Tmpl.exec("${fruit<::A=Apple,B=Banana,C=Cherry>}", context, true));
+    }
+
+    @Test
     public void test_customized_a() {
         assertEquals("A100C", Tmpl.exec("A@<b(int)?89>C", "@", "<", ">", Lang.map("b:100"), true));
         assertEquals("A100C", Tmpl.exec("A@{b(int)?89}C", "@", Lang.map("b:100"), true));
@@ -114,6 +137,9 @@ public class TmplTest {
 
         assertEquals("false", Tmpl.exec("${v<boolean>}", null));
         assertEquals("false", Tmpl.exec("${v<boolean>}", Lang.map("{}")));
+
+        assertEquals("yes", Tmpl.exec("${v<boolean:/yes>}", Lang.map("v:true")));
+        assertEquals("", Tmpl.exec("${v<boolean:/yes>}", Lang.map("v:false")));
     }
 
 }

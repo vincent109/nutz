@@ -23,3 +23,5 @@
 .gradle
 local.properties
 /mysrc
+*.iml
+/local_conf

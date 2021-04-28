@@ -28,11 +28,12 @@ Nutz遵循Apache协议,完全开源,文档齐全,永远免费(商用也是)
 *   在线文档
     *   [官网](https://nutzam.com/core/nutz_preface.html) Nutz手册,涵盖方方面面
     *   [w3cschool上的文档](http://www.w3cschool.cn/nutz/) [由vincent109维护](https://github.com/vincent109)
+    *   [github pages](https://nutzam.github.io/nutz/) github 的 pages
 *   [各种插件](http://github.com/nutzam/nutzmore) 您能想到的都有哦(基本上`^_^`)
 *   [好玩的Nutzbook](http://nutzbook.wendal.net) 几分钟搭建一个demo有何不可? 入门从这里开始
 *	[在线javadoc](https://nutzam.com/javadoc/) 注释就是这么全
 *	[NutzWk](https://github.com/Wizzercn/NutzWk) 基于Nutz的Java开源企业级开发框架
-*	[Nutz-Onekey](https://github.com/Kerbores/NUTZ-ONEKEY) NUTZ一键脚手架
+*	[Idea插件](https://github.com/threefish/NutzCodeInsight) idea 插件
 
 ## Nutz生态系统
 
@@ -44,7 +45,7 @@ Nutz遵循Apache协议,完全开源,文档齐全,永远免费(商用也是)
 		<dependency>
 			<groupId>org.nutz</groupId>
 			<artifactId>nutz</artifactId>
-			<version>1.r.63.r2</version>
+			<version>1.r.68.v20190220</version>
 		</dependency>
 ```
 
@@ -54,7 +55,7 @@ Nutz遵循Apache协议,完全开源,文档齐全,永远免费(商用也是)
 ## Gradle 依赖
 
 ```gradle
-compile(group: 'org.nutz', name: 'nutz', version:'1.r.63.r2')
+compile(group: 'org.nutz', name: 'nutz', version:'1.r.68.v20190220')
 ```
 
 ## 采用Nutz的公司
@@ -78,3 +79,33 @@ http://www.jetbrains.com
 ## 关于我们
 
 广州市文尔软件科技有限公司
+
+## Contributors
+
+This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
+<a href="graphs/contributors"><img src="https://opencollective.com/nutz/contributors.svg?width=890&button=false" /></a>
+
+
+## Backers
+
+Thank you to all our backers! 🙏 [[Become a backer](https://opencollective.com/nutz#backer)]
+
+<a href="https://opencollective.com/nutz#backers" target="_blank"><img src="https://opencollective.com/nutz/backers.svg?width=890"></a>
+
+
+## Sponsors
+
+Support this project by becoming a sponsor. Your logo will show up here with a link to your website. [[Become a sponsor](https://opencollective.com/nutz#sponsor)]
+
+<a href="https://opencollective.com/nutz/sponsor/0/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/0/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/1/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/1/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/2/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/2/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/3/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/3/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/4/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/4/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/5/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/5/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/6/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/6/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/7/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/7/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/8/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/8/avatar.svg"></a>
+<a href="https://opencollective.com/nutz/sponsor/9/website" target="_blank"><img src="https://opencollective.com/nutz/sponsor/9/avatar.svg"></a>
+
+

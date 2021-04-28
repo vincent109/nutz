@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
@@ -16,6 +17,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 import org.nutz.Nutz;
+import org.nutz.conf.NutConf;
 import org.nutz.ioc.Ioc;
 import org.nutz.ioc.IocContext;
 import org.nutz.json.Json;
@@ -24,12 +26,13 @@ import org.nutz.lang.Strings;
 import org.nutz.lang.util.Context;
 import org.nutz.lang.util.NutMap;
 import org.nutz.mvc.config.AtMap;
+import org.nutz.mvc.i18n.LocalizationManager;
 import org.nutz.mvc.impl.NutMessageMap;
 import org.nutz.mvc.ioc.SessionIocContext;
 
 /**
  * Mvc 相关帮助函数
- * 
+ *
  * @author zozoh(zozohtnt@gmail.com)
  * @author wendal(wendal1985@gmail.com)
  */
@@ -47,23 +50,34 @@ public abstract class Mvcs {
     public static boolean DISPLAY_METHOD_LINENUMBER = true;
     // 如果一个Resp已经commit过了,那么是否跳过渲染呢
     public static boolean SKIP_COMMITTED = false;
-    
+
     public static boolean DISABLE_X_POWERED_BY = false;
-    
+
     public static String X_POWERED_BY = "nutz/"+Nutz.version()+" <nutzam.com>";
+    
+    public static LocalizationManager localizationManager;
+    
+    public static void setLocalizationManager(LocalizationManager localizationManager) {
+        Mvcs.localizationManager = localizationManager;
+    }
 
     // ====================================================================
 
-    public static Map<String, Object> getLocaleMessage(String key) {
-        Map<String, Map<String, Object>> msgss = getMessageSet();
-        if (null != msgss)
-            return msgss.get(key);
-        return null;
+    public static Map<String, Object> getLocaleMessage(String local) {
+        if (localizationManager != null) {
+            return localizationManager.getMessageMap(local);
+        }
+        else {
+            Map<String, Map<String, Object>> msgss = getMessageSet();
+            if (null != msgss)
+                return msgss.get(local);
+            return null;
+        }
     }
 
     /**
      * 获取当前请求对象的字符串表
-     * 
+     *
      * @param req
      *            请求对象
      * @return 字符串表
@@ -75,7 +89,7 @@ public abstract class Mvcs {
 
     /**
      * 获取当前请求对象的字符串表（NutMessageMap 封装）
-     * 
+     *
      * @param req
      *            请求对象
      * @return 字符串表
@@ -86,7 +100,7 @@ public abstract class Mvcs {
 
     /**
      * 获取当前请求对象的字符串表中的某一个字符串
-     * 
+     *
      * @param req
      *            请求对象
      * @param key
@@ -102,7 +116,7 @@ public abstract class Mvcs {
 
     /**
      * 获取当前会话的本地字符串集合的键值；如果当前 HTTP 会话不存在，则返回 null
-     * 
+     *
      * @return 当前会话的本地字符串集合的键值；如果当前 HTTP 会话不存在，则返回 null
      */
     public static String getLocalizationKey() {
@@ -114,7 +128,7 @@ public abstract class Mvcs {
      * <p>
      * 如果你用的是 Nutz.Mvc 默认的本地化机制，那么你的本地字符串键值，相当于一个你目录名。 <br>
      * 比如 "zh_CN" 等
-     * 
+     *
      * @param key
      *            键值
      * @return 是否设置成功
@@ -129,7 +143,7 @@ public abstract class Mvcs {
 
     /**
      * 返回当前加载了的本地化字符串的键值
-     * 
+     *
      * @return 当前都加载了哪些种字符串的 KEY
      */
     public static Set<String> getLocalizationKeySet() {
@@ -146,7 +160,7 @@ public abstract class Mvcs {
 
     /**
      * 设置默认的多国语言
-     * 
+     *
      * @param key
      *            默认的多国语言 KEY
      */
@@ -156,7 +170,7 @@ public abstract class Mvcs {
 
     /**
      * 返回默认的本地化字符串 KEY
-     * 
+     *
      * @return 默认的本地化字符串 KEY
      */
     public static String getDefaultLocalizationKey() {
@@ -169,40 +183,54 @@ public abstract class Mvcs {
      * <li>本地化子字符串 => ${msg}
      * <li>应用的路径名 => ${base}
      * </ul>
-     * 
+     *
      * @param req
      *            HTTP 请求对象
      */
     public static void updateRequestAttributes(HttpServletRequest req) {
         // 初始化本次请求的多国语言字符串
-        Map<String, Map<String, Object>> msgss = getMessageSet();
-        if (msgss == null && !ctx().localizations.isEmpty())
-            msgss = ctx().localizations.values().iterator().next();
-        if (null != msgss) {
-            Map<String, Object> msgs = null;
+        if (localizationManager == null) {
+            Map<String, Map<String, Object>> msgss = getMessageSet();
+            if (msgss == null && !ctx().localizations.isEmpty())
+                msgss = ctx().localizations.values().iterator().next();
+            if (null != msgss) {
+                Map<String, Object> msgs = null;
 
-            String lKey = Strings.sBlank(Mvcs.getLocalizationKey(), getDefaultLocalizationKey());
+                String lKey = Strings.sBlank(Mvcs.getLocalizationKey(), getDefaultLocalizationKey());
 
-            if (!Strings.isBlank(lKey))
-                msgs = msgss.get(lKey);
+                if (!Strings.isBlank(lKey))
+                    msgs = msgss.get(lKey);
 
-            // 没有设定特殊的 Local 名字，随便取一个
-            if (null == msgs) {
-                if (msgss.size() > 0)
-                    msgs = msgss.values().iterator().next();
+                // 没有设定特殊的 Local 名字，随便取一个
+                if (null == msgs) {
+                    if (msgss.size() > 0)
+                        msgs = msgss.values().iterator().next();
+                }
+                // 记录到请求中
+                req.setAttribute(MSG, msgs);
             }
-            // 记录到请求中
-            req.setAttribute(MSG, msgs);
+        }
+        else {
+            String lKey = Mvcs.getLocalizationKey();
+            if (Strings.isBlank(lKey)) {
+                lKey = localizationManager.getDefaultLocal();
+                if (Strings.isBlank(lKey))
+                    lKey = getDefaultLocalizationKey();
+            }
+            NutMessageMap msg = localizationManager.getMessageMap(lKey);
+            if (msg != null)
+                req.setAttribute(MSG, msg);
         }
 
         // 记录一些数据到请求对象中
         req.setAttribute("base", req.getContextPath());
-        req.setAttribute("$request", req);
+        if (NutConf.MVC_ADD_ATTR_$REQUEST)
+            req.setAttribute("$request", req);
     }
 
     /**
      * 获取当前请求的路径，并去掉后缀
-     * 
+     *
      * @param req
      *            HTTP 请求对象
      */
@@ -212,11 +240,21 @@ public abstract class Mvcs {
 
     /**
      * 获取当前请求的路径，并去掉后缀
-     * 
+     *
      * @param req
      *            HTTP 请求对象
      */
     public static RequestPath getRequestPathObject(HttpServletRequest req) {
+        Object includeUrl = req.getAttribute(RequestDispatcher.INCLUDE_PATH_INFO);
+        if (includeUrl != null) {
+            return getRequestPathObject(includeUrl.toString());
+        }
+
+        includeUrl = req.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH);
+        if (includeUrl != null) {
+            return getRequestPathObject(includeUrl.toString());
+        }
+
         String url = req.getPathInfo();
         if (null == url)
             url = req.getServletPath();
@@ -225,7 +263,7 @@ public abstract class Mvcs {
 
     /**
      * 获取当前请求的路径，并去掉后缀
-     * 
+     *
      * @param url
      *            请求路径的URL
      */
@@ -256,7 +294,7 @@ public abstract class Mvcs {
 
     /**
      * 注销当前 HTTP 会话。所有 Ioc 容器存入的对象都会被注销
-     * 
+     *
      * @param session
      *            HTTP 会话对象
      */
@@ -267,7 +305,7 @@ public abstract class Mvcs {
 
     /**
      * 它将对象序列化成 JSON 字符串，并写入 HTTP 响应
-     * 
+     *
      * @param resp
      *            响应对象
      * @param obj
@@ -281,7 +319,7 @@ public abstract class Mvcs {
             throws IOException {
         write(resp, resp.getWriter(), obj, format);
     }
-    
+
     public static void write(HttpServletResponse resp, Writer writer, Object obj, JsonFormat format)
             throws IOException {
         resp.setHeader("Cache-Control", "no-cache");
@@ -324,7 +362,7 @@ public abstract class Mvcs {
 
     /**
      * 获取 HTTP 请求对象
-     * 
+     *
      * @return HTTP 请求对象
      */
     public static final HttpServletRequest getReq() {
@@ -333,7 +371,7 @@ public abstract class Mvcs {
 
     /**
      * 获取 HTTP 响应对象
-     * 
+     *
      * @return HTTP 响应对象
      */
     public static final HttpServletResponse getResp() {
@@ -346,7 +384,7 @@ public abstract class Mvcs {
 
     /**
      * 获取 Action 执行的上下文
-     * 
+     *
      * @return Action 执行的上下文
      */
     public static final ActionContext getActionContext() {
@@ -361,7 +399,7 @@ public abstract class Mvcs {
 
     /**
      * 设置 Servlet 执行的上下文
-     * 
+     *
      * @param servletContext
      *            Servlet 执行的上下文
      */
@@ -376,7 +414,7 @@ public abstract class Mvcs {
 
     /**
      * 设置 Action 执行的上下文
-     * 
+     *
      * @param actionContext
      *            Action 执行的上下文
      */
@@ -386,7 +424,7 @@ public abstract class Mvcs {
 
     /**
      * 获取 Servlet 执行的上下文
-     * 
+     *
      * @return Servlet 执行的上下文
      */
     public static ServletContext getServletContext() {
@@ -398,7 +436,7 @@ public abstract class Mvcs {
 
     /**
      * 设置对象装配的上下文环境
-     * 
+     *
      * @param iocContext
      *            对象装配的上下文环境
      */
@@ -408,7 +446,7 @@ public abstract class Mvcs {
 
     /**
      * 获取对象装配的上下文环境
-     * 
+     *
      * @return 进行对象装配的上下文环境
      */
     public static IocContext getIocContext() {
@@ -420,7 +458,7 @@ public abstract class Mvcs {
 
     /**
      * 获取全局的Ioc对象
-     * 
+     *
      * @return 全局的Ioc对象
      */
     public static Ioc getIoc() {
@@ -483,21 +521,21 @@ public abstract class Mvcs {
         ctx().close();
         ctx = new NutMvcContext();
     }
-    
+
     public static Context reqt() {
         return ctx().reqCtx();
     }
-    
+
     public static Object getSessionAttrSafe(String key) {
         try {
             HttpSession session = getHttpSession(false);
             return session != null ? session.getAttribute(key) : null;
         }
-        catch (Exception e) {
-            return false;
+        catch (Throwable e) {
+            return null;
         }
     }
-    
+
     public static void setSessionAttrSafe(String key, Object val, boolean sessionCreate) {
         try {
             HttpSession session = getHttpSession(sessionCreate);
@@ -507,7 +545,7 @@ public abstract class Mvcs {
         catch (Exception e) {
         }
     }
-    
+
     public static NutMap toParamMap(Reader r, String enc) throws IOException {
         try {
             NutMap map = new NutMap();
@@ -535,6 +573,6 @@ public abstract class Mvcs {
             throw new IOException(e);
         }
     }
-    
-    
+
+
 }

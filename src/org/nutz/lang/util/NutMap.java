@@ -8,8 +8,10 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.nutz.castor.Castors;
@@ -19,6 +21,7 @@ import org.nutz.lang.Lang;
 import org.nutz.lang.Mirror;
 import org.nutz.lang.Strings;
 import org.nutz.lang.born.Borning;
+import org.nutz.mapl.Mapl;
 
 /**
  * 对于 LinkedHashMap 的一个友好封装
@@ -27,8 +30,12 @@ import org.nutz.lang.born.Borning;
  * 
  * @author zozoh(zozohtnt@gmail.com)
  */
-@SuppressWarnings("serial")
 public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     public static NutMap WRAP(Map<String, Object> map) {
         if (null == map)
@@ -103,6 +110,42 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
         return map;
     }
 
+    public Object getFallback(String... keys) {
+        for (String key : keys) {
+            Object val = this.get(key);
+            if (null != val) {
+                return val;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Object getOr(String key) {
+        return getOr(key, null);
+    }
+
+    @Override
+    public Object getOr(String key, Object dft) {
+        if (Strings.isBlank(key))
+            return null;
+        String[] ks = Strings.splitIgnoreBlank(key, "[|]");
+        return this.getOrBy(ks, dft);
+    }
+
+    @Override
+    public Object getOrBy(String[] keys, Object dft) {
+        if (null == keys || keys.length == 0)
+            return null;
+        for (String k : keys) {
+            Object v = Mapl.cell(this, k);
+            if (null != v) {
+                return v;
+            }
+        }
+        return dft;
+    }
+
     /**
      * 从 Map 里挑选一些键生成一个新的 Map
      * 
@@ -115,11 +158,10 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
         if (keys.length == 0)
             return new NutMap();
         NutMap re = new NutMap();
-        for (Map.Entry<String, Object> en : this.entrySet()) {
-            String key = en.getKey();
-            if (Lang.contains(keys, key)) {
-                re.put(key, en.getValue());
-            }
+        for (String key : keys) {
+            Object val = this.get(key);
+            if (null != val)
+                re.put(key, val);
         }
         return re;
     }
@@ -155,7 +197,7 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
         if (Strings.isBlank(regex))
             return this.duplicate();
         boolean isNot = regex.startsWith("!");
-        Pattern p = Pattern.compile(isNot ? regex.substring(1) : regex);
+        Pattern p = Regex.getPattern(isNot ? regex.substring(1) : regex);
         return pickBy(p, isNot);
     }
 
@@ -202,6 +244,7 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
      * 
      * @see #pickAndRemoveBy(Pattern, boolean)
      */
+    @Override
     public NutMap pickAndRemoveBy(String regex) {
         if (Strings.isBlank(regex))
             return new NutMap();
@@ -329,11 +372,17 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
     }
 
     @Override
-    public Set<Entry<String, Object>> entrySet() {
+    public Set<Map.Entry<String, Object>> entrySet() {
         if (null == _map)
             return super.entrySet();
-        HashSet<Entry<String, Object>> vals = new HashSet<Entry<String, Object>>();
+
+        HashSet<Map.Entry<String, Object>> vals = new HashSet<Map.Entry<String, Object>>();
         vals.addAll(_map.entrySet());
+        for (Map.Entry<String, Object> entry : _map.entrySet()) {
+            // 如果本身也有这个entry，attach 上来的那个就要删除掉
+            if (super.containsKey(entry.getKey()))
+                vals.remove(entry);
+        }
         vals.addAll(super.entrySet());
         return vals;
     }
@@ -345,15 +394,15 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
             _map.clear();
     }
 
-    private NutMap _map;
+    private Map<String, Object> _map;
 
-    public NutMap attach(NutMap map) {
+    public NutMap attach(Map<String, Object> map) {
         _map = map;
         return this;
     }
 
-    public NutMap detach() {
-        NutMap re = _map;
+    public Map<String, Object> detach() {
+        Map<String, Object> re = _map;
         _map = null;
         return re;
     }
@@ -505,7 +554,16 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
         Object v = get(key);
         if (null == v)
             return null;
-        return (List) v;
+        List list = (List) v;
+        ListIterator it = list.listIterator();
+        while (it.hasNext()) {
+            Object ele = it.next();
+            if (null != ele && !eleType.isAssignableFrom(ele.getClass())) {
+                Object ele2 = Castors.me().castTo(ele, eleType);
+                it.set(ele2);
+            }
+        }
+        return list;
     }
 
     /**
@@ -609,6 +667,38 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
             put(key, list);
         }
         list.add(value);
+        return this;
+    }
+
+    /**
+     * 为 Map 增加一个名值对。强制设置为一个列表，如果有同名则合并。<br>
+     * 值如果是集合或者数组则拆包。
+     * 
+     * @param key
+     * @param value
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public NutMap addv3(String key, Object value) {
+        List<Object> list = (List<Object>) get(key);
+        if (null == list) {
+            list = new LinkedList<Object>();
+            put(key, list);
+        }
+        if (null != value) {
+            if (value instanceof Collection<?>) {
+                Collection<?> col = (Collection<?>) value;
+                list.addAll(col);
+            } else if (value.getClass().isArray()) {
+                int len = Array.getLength(value);
+                for (int i = 0; i < len; i++) {
+                    Object ele = Array.get(value, i);
+                    list.add(ele);
+                }
+            } else {
+                list.add(value);
+            }
+        }
         return this;
     }
 
@@ -874,7 +964,14 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
             // 其他的值，匹配一下
             else {
                 Object val = map.get(key);
-                if (!__match_val(mtc, val)) {
+                // 空串"" 表示必须有这个键，且不能为空
+                if (Strings.isEmpty(mtc.toString())) {
+                    if (null == val || Strings.isBlank(val.toString())) {
+                        return false;
+                    }
+                }
+                // 复杂匹配
+                else if (!__match_val(mtc, val)) {
                     return false;
                 }
             }
@@ -883,6 +980,72 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
         return true;
     }
 
+    private static final Pattern _M_RG_TP = Regex.getPattern("^(int|float|double|long|time|date)?"
+                                                             + "([\\[(][^\\[\\]()]+[\\])])$");
+
+    /**
+     * 将自己的字段（仅第一层）预编译，即：
+     * <ul>
+     * <li><code>"^xxx"</code> : 变正则</li>
+     * <li><code>"$TYPE[12,43)"</code> : 变区间，类型支持
+     * `int|float|double|long|time|date`</li>
+     * <li>其他维持不变
+     * </ul>
+     * 以便可以提高 match 函数执行的效率
+     * 
+     * @return 自身以便链式赋值
+     */
+    public NutMap evalSelfForMatching() {
+        for (Map.Entry<String, Object> en : this.entrySet()) {
+            Object val = en.getValue();
+            if (null != val && val instanceof String) {
+                String str = (String) val;
+                // 正则
+                if (str.startsWith("^")) {
+                    en.setValue(Pattern.compile(str));
+                    continue;
+                }
+                // 区间
+                Matcher m = _M_RG_TP.matcher(str);
+                if (m.find()) {
+                    String type = Strings.sBlank(m.group(1), "int");
+                    String rval = m.group(2);
+                    Region<?> rg = null;
+                    // 整数区间
+                    if ("int".equals(type)) {
+                        rg = Region.Int(rval);
+                    }
+                    // 长整数区间
+                    else if ("long".equals(type)) {
+                        rg = Region.Long(rval);
+                    }
+                    // 浮点区间
+                    else if ("float".equals(type)) {
+                        rg = Region.Float(rval);
+                    }
+                    // 双精度浮点区间
+                    else if ("double".equals(type)) {
+                        rg = Region.Double(rval);
+                    }
+                    // 日期区间
+                    else if ("date".equals(type)) {
+                        rg = Region.Date(rval);
+                    }
+                    // 时间区间
+                    else if ("time".equals(type)) {
+                        rg = Region.Time(rval);
+                    }
+                    // Update
+                    if (null != rg) {
+                        en.setValue(rg);
+                    }
+                }
+            }
+        }
+        return this;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private boolean __match_val(final Object mtc, Object val) {
         Mirror<?> mi = Mirror.me(mtc);
 
@@ -897,7 +1060,7 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
 
             final String s = mtc.toString();
             if (s.startsWith("^")) {
-                regex = Pattern.compile(s);
+                regex = Regex.getPattern(s);
             }
             // 不是正则表达式，那么精确匹配字符串
             else {
@@ -946,8 +1109,12 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
             return re[0];
         }
         // 范围的话...
-        else if (mi.is(Region.class)) {
-            throw Lang.noImplement();
+        else if (mi.isOf(Region.class)) {
+            if (val instanceof Comparable) {
+                Comparable cp = (Comparable) val;
+                Region rg = (Region) mtc;
+                return rg.match(cp);
+            }
         }
         // 其他的统统为不匹配
         return false;
@@ -958,7 +1125,12 @@ public class NutMap extends LinkedHashMap<String, Object> implements NutBean {
     }
 
     public int evalInt(String el) {
-        return (Integer) El.eval(Lang.context(this), el);
+        Object obj = El.eval(Lang.context(this), el);
+        if (obj == null)
+            return 0;
+        if (obj instanceof Number)
+            return ((Number) obj).intValue();
+        return Integer.parseInt(obj.toString());
     }
 
     /**

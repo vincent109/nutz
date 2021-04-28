@@ -3,6 +3,7 @@ package org.nutz.dao.util.cri;
 import org.nutz.dao.entity.Entity;
 import org.nutz.dao.jdbc.Jdbcs;
 import org.nutz.dao.jdbc.ValueAdaptor;
+import org.nutz.dao.util.lambda.PFun;
 
 public abstract class NumberRange extends AbstractSqlExpression {
 
@@ -10,7 +11,11 @@ public abstract class NumberRange extends AbstractSqlExpression {
 
     protected long[] ids;
 
-    protected NumberRange(String name) {
+    public NumberRange(String name) {
+        super(name);
+    }
+
+    public <T> NumberRange(PFun<T, ?> name) {
         super(name);
     }
 
@@ -23,7 +28,7 @@ public abstract class NumberRange extends AbstractSqlExpression {
             for (int i = 0; i < ids.length; i++)
                 sb.append("?,");
             sb.setCharAt(sb.length() - 1, ')');
-        } //OK,无需添加.
+        } // OK,无需添加.
     }
 
     public int joinAdaptor(Entity<?> en, ValueAdaptor[] adaptors, int off) {

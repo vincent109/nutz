@@ -1,44 +1,64 @@
 package org.nutz.http;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.Writer;
-import java.net.HttpURLConnection;
-import java.nio.charset.Charset;
-import java.util.Map;
-
 import org.nutz.lang.Encoding;
 import org.nutz.lang.Lang;
 import org.nutz.lang.Streams;
 import org.nutz.lang.Strings;
+import org.nutz.lang.util.NutMap;
+
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.nio.charset.Charset;
+import java.util.Map;
 
 public class Response {
     private static final String DEF_PROTOCAL_VERSION = "HTTP/1.1";
+    
+    public Response() {
+    }
 
     public Response(HttpURLConnection conn, Map<String, String> reHeader) throws IOException {
         status = conn.getResponseCode();
         detail = conn.getResponseMessage();
         this.header = Header.create(reHeader);
-        String s = header.get("Set-Cookie");
-        if (null != s) {
-            this.cookie = new Cookie();
-            this.cookie.afterResponse(null, conn, null); // 解决多个Set-Cookie丢失的问题
-        }
+        for (String name : header.keys())
+        	if ("Set-Cookie".equalsIgnoreCase(name)) {
+        		this.cookie = new Cookie();
+                this.cookie.afterResponse(null, conn, null); // 解决多个Set-Cookie丢失的问题
+        		break;
+        	}
+        encode = getEncodeType();
+    }
+    
+    public Response(HttpURLConnection conn, NutMap reHeader) throws IOException {
+        status = conn.getResponseCode();
+        detail = conn.getResponseMessage();
+        this.header = Header.create(reHeader);
+        for (String name : header.keys())
+        	if ("Set-Cookie".equalsIgnoreCase(name)) {
+        		this.cookie = new Cookie();
+                this.cookie.afterResponse(null, conn, null); // 解决多个Set-Cookie丢失的问题
+        		break;
+        	}
+        encode = getEncodeType();
     }
 
     private Header header;
     private InputStream stream;
     private Cookie cookie;
-    private String protocal = DEF_PROTOCAL_VERSION;
+    private String protocol = DEF_PROTOCAL_VERSION;
     private int status;
     private String detail;
     private String content;
+    private String encode;
 
+    public String getProtocol() {
+        return protocol;
+    }
+    
+    @Deprecated
     public String getProtocal() {
-        return protocal;
+        return protocol;
     }
 
     public int getStatus() {
@@ -73,17 +93,29 @@ public class Response {
      * 根据Http头的Content-Type获取网页的编码类型，如果没有设的话则返回null
      */
     public String getEncodeType() {
-        String contextType = header.get("Content-Type");
-        if (null != contextType) {
-            for (String tmp : contextType.split(";")) {
+        String contentType = header.get("Content-Type");
+        if (null != contentType) {
+            for (String tmp : contentType.split(";")) {
                 if (tmp == null)
                     continue;
                 tmp = tmp.trim();
-                if (tmp.startsWith("charset="))
-                    return Strings.trim(tmp.substring(8)).trim();
+                if (tmp.startsWith("charset=")) {
+                    tmp = Strings.trim(tmp.substring(8)).trim();
+                    if (tmp.contains(","))
+                        tmp = tmp.substring(0, tmp.indexOf(',')).trim();
+                    return tmp;
+                }
             }
         }
-        return null;
+        return Encoding.UTF8;
+    }
+    
+    public void setEncode(String encode) {
+        this.encode = encode;
+    }
+    
+    public String getEncode() {
+        return encode;
     }
 
     public InputStream getStream() {
@@ -99,9 +131,20 @@ public class Response {
     }
 
     public Reader getReader(String charsetName) {
+        if (content != null)
+            return new StringReader(charsetName);
         return new InputStreamReader(getStream(), Charset.forName(charsetName));
     }
 
+	public Reader getReader(Charset charset) {
+
+        if (charset == null) {
+            throw new IllegalArgumentException("charset can not be null");
+        }
+
+
+        return getReader(charset.name());
+    }
     public Cookie getCookie() {
         return cookie;
     }
@@ -139,15 +182,16 @@ public class Response {
     }
 
     public String getContent() {
-        if (Strings.isBlank(content)) {
-            content = getContent(null);
-        }
-        return content;
+        return getContent(encode);
     }
 
     public String getContent(String charsetName) {
-        if (charsetName == null)
-            return Streams.readAndClose(getReader());
-        return Streams.readAndClose(getReader(charsetName));
+        if (content == null) {
+            if (charsetName == null)
+                content = Streams.readAndClose(getReader(encode));
+            else
+                content = Streams.readAndClose(getReader(charsetName));
+        }
+        return content;
     }
 }

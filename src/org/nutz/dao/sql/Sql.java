@@ -1,5 +1,7 @@
 package org.nutz.dao.sql;
 
+import java.util.Map;
+
 import org.nutz.dao.Condition;
 import org.nutz.dao.entity.Entity;
 import org.nutz.dao.entity.Record;
@@ -32,6 +34,14 @@ public interface Sql extends DaoStatement {
     Sql setVar(String name, Object value);
 
     /**
+     * 批量设置vars
+     * @param vars 参数集合
+     * @return 原Sql对象,用于链式调用
+     * @see #params()
+     */
+    Sql setVars(Map<String,Object> vars);
+
+    /**
      * 所谓"参数"，就是当 Sql 对象转换成 PreparedStatement 对象前，会被填充成 ? 的占位符
      * <p>
      * 集合是一个个的名值对，你设置了值的地方，会在执行时，被设置到 PreparedStatement中。<br>
@@ -49,6 +59,14 @@ public interface Sql extends DaoStatement {
      * @see #params()
      */
     Sql setParam(String name, Object value);
+
+    /**
+     * 批量设置params
+     * @param params 参数集合
+     * @return 原Sql对象,用于链式调用
+     * @see #params()
+     */
+    Sql setParams(Map<String,Object> params);
 
     /**
      * 手动为某个语句参数设置适配器。
@@ -138,4 +156,6 @@ public interface Sql extends DaoStatement {
      * @return 当前SQL对象
      */
     Sql changePlaceholder(char param, char var);
+    
+    Sql appendSourceSql(String ext);
 }

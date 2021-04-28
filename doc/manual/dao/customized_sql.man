@@ -39,7 +39,7 @@ Nutz.Dao 自定义 SQL 的概述
 		/* delete.data */
 		DELETE FROM $table WHERE name LIKE @name
 		/* update.data */
-		UPDATE FROM $table SET name=@name WHERE id=@id
+		UPDATE $table SET name=@name WHERE id=@id
 		}}}
 		在你的 Java 代码中：
 		{{{
@@ -88,6 +88,7 @@ Sql 对象 -- org.nutz.dao.sql.Sql
 				}}}
 			 * 在执行 SQL 前，该占位符会被字符 "{#F0F;*?}" 替换，用来创建 PreparedStatement
 			 * Nutz.Dao 会自动计算 PreparedStatement的索引值
+	     * 从1.r.67的2018-12-23号起的快照版,支持带定界符的`${abc}` 和 `@{abc}` 形式
 		
 		所有的占位符可以同样的名称出现的多个地方。并且变量占位符和参数占位符的名称不互相干扰，比如:
 		{{{<JAVA>
@@ -128,6 +129,10 @@ Sql 对象 -- org.nutz.dao.sql.Sql
 		}}}
 		这就完了吗？我怎么取得查询的结果呢。是的，同 UPDATE, DELETE, INSERT 不同， SELECT 是需要返回
 		结果的，但是 Nutz.Dao 也不太清楚怎样为你自定义的 SELECT 语句返回结果，于是，就需要你设置回调。
+
+		Tips:
+			如果运行的 sql 语句是类似 "show columns from tableName from dbName" 这样的语句，
+			请在调用 dao.execute 方法前调用 sql.forceExecQuery 方法来强制让 nutz 用 select 方式运行该 sql 语句。
 
 	回调的用处
 		接上例，你需要这么改造一下你的函数：
@@ -279,7 +284,7 @@ Nutz.Dao SQL 文件的格式
 	是的，你的 Sql 对象也可以使用 Condition，但是这个 Condition 要如何同你自定义的 SQL 拼装在一起呢，
 	这里，我提供了一个特殊的变量占位符 -- 条件变量占位符 $condition
 	--------------------------------------------------------------------------------------------
-	特殊的占位符 -- {#00A;*${condition}}
+	特殊的占位符 -- {#00A;*$condition}
 		唯一需要说明的是，在你写作的 SQL 中，需要声明一个特殊的占位符，比如下面的代码输出所有 id 大
 		于 35 的 Pet 对象的名称
 		{{{<JAVA>

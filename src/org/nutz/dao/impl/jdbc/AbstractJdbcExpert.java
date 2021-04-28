@@ -28,15 +28,19 @@ import org.nutz.dao.jdbc.JdbcExpertConfigFile;
 import org.nutz.dao.jdbc.Jdbcs;
 import org.nutz.dao.jdbc.ValueAdaptor;
 import org.nutz.dao.sql.DaoStatement;
+import org.nutz.dao.sql.PItem;
 import org.nutz.dao.sql.Pojo;
 import org.nutz.dao.sql.Sql;
 import org.nutz.dao.sql.SqlContext;
 import org.nutz.dao.sql.SqlType;
 import org.nutz.dao.util.Daos;
+import org.nutz.dao.util.Pojos;
+import org.nutz.lang.Configurable;
 import org.nutz.lang.Lang;
 import org.nutz.lang.Mirror;
 import org.nutz.lang.Strings;
 import org.nutz.lang.segment.CharSegment;
+import org.nutz.lang.util.NutMap;
 import org.nutz.log.Log;
 import org.nutz.log.Logs;
 
@@ -45,7 +49,7 @@ import org.nutz.log.Logs;
  *
  * @author zozoh(zozohtnt@gmail.com)
  */
-public abstract class AbstractJdbcExpert implements JdbcExpert {
+public abstract class AbstractJdbcExpert implements JdbcExpert, Configurable {
 
     private static final Log log = Logs.get();
 
@@ -72,7 +76,7 @@ public abstract class AbstractJdbcExpert implements JdbcExpert {
     public void setupEntityField(Connection conn, Entity<?> en) {
         List<MappingField> mfs = new ArrayList<MappingField>();
         for (MappingField mf : en.getMappingFields()) {
-            if (mf.getTypeMirror().isEnum()) {
+            if (mf.getMirror().isEnum()) {
                 mfs.add(mf);
             }
         }
@@ -123,7 +127,7 @@ public abstract class AbstractJdbcExpert implements JdbcExpert {
     }
 
     public ValueAdaptor getAdaptor(MappingField ef) {
-        Mirror<?> mirror = ef.getTypeMirror();
+        Mirror<?> mirror = ef.getMirror();
         // 为数字型枚举的特殊判断
         if (mirror.isEnum() && ColType.INT == ef.getColumnType())
             return Jdbcs.Adaptor.asEnumInt;
@@ -238,9 +242,12 @@ public abstract class AbstractJdbcExpert implements JdbcExpert {
                 return "NUMERIC(" + mf.getWidth() + "," + mf.getPrecision() + ")";
             }
             // 用默认精度
-            if (mf.getTypeMirror().isDouble())
+            if (mf.getMirror().isDouble())
                 return "NUMERIC(15,10)";
             return "FLOAT";
+
+        case DOUBLE:
+            return "DOUBLE";
 
         case PSQL_ARRAY:
             return "ARRAY";
@@ -256,7 +263,7 @@ public abstract class AbstractJdbcExpert implements JdbcExpert {
         }
     }
 
-    protected static List<DaoStatement> wrap(String... sqls) {
+    protected static List<DaoStatement> getNumberOfRecords(String... sqls) {
         List<DaoStatement> sts = new ArrayList<DaoStatement>(sqls.length);
         for (String sql : sqls)
             if (!Strings.isBlank(sql))
@@ -338,7 +345,7 @@ public abstract class AbstractJdbcExpert implements JdbcExpert {
                                                                                       : commentColumn);
                     columnCommentSQL.vars()
                                     .set("table", en.getTableName())
-                                    .set("column", mf.getColumnName())
+                                    .set("column", mf.getColumnNameInSql())
                                     .set("columnComment", mf.getColumnComment());
                     sqls.add(columnCommentSQL);
                 }
@@ -397,7 +404,7 @@ public abstract class AbstractJdbcExpert implements JdbcExpert {
             return;
         String dft = getDefaultValue(mf);
         if (mf.getColumnType() == ColType.VARCHAR
-                || mf.getTypeMirror().isStringLike())
+                || mf.getMirror().isStringLike())
             sb.append(" DEFAULT '").append(dft).append('\'');
         else
             sb.append(" DEFAULT ").append(dft);
@@ -419,7 +426,7 @@ public abstract class AbstractJdbcExpert implements JdbcExpert {
         return keywords;
     }
 
-    public String wrapKeywork(String columnName, boolean force) {
+    public String wrapKeyword(String columnName, boolean force) {
         if (force || keywords.contains(columnName.toUpperCase()))
             return "`" + columnName + "`";
         return null;
@@ -480,5 +487,30 @@ public abstract class AbstractJdbcExpert implements JdbcExpert {
             names.add(index);
         }
         return names;
+    }
+
+    public void setupProperties(NutMap conf) {
+    }
+    
+    @Override
+    public PItem formatLeftJoinLink(Object obj, LinkField lnk, Entity<?> en) {
+    	Entity<?> lnkEntity = lnk.getLinkedEntity();
+        String linkName = safeTableName(lnk.getName());
+        String LJ = String.format("LEFT JOIN %s as %s ON %s.%s = %s.%s",
+                                  lnkEntity.getTableName(),
+                                  linkName,
+                                  en.getTableName(),
+                                  lnk.getHostField().getColumnNameInSql(),
+                                  linkName,
+                                  lnk.getLinkedField().getColumnNameInSql());
+    	return Pojos.Items.wrap(LJ);
+    }
+    
+    protected String safeTableName(String tableName) {
+        if (!Daos.CHECK_COLUMN_NAME_KEYWORD) {
+            //return tableName;
+        }
+        String str = wrapKeyword(tableName, Daos.FORCE_WRAP_COLUMN_NAME);
+        return str == null ? tableName : str;
     }
 }

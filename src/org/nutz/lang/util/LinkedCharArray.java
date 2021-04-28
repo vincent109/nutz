@@ -1,11 +1,14 @@
 package org.nutz.lang.util;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
 import org.nutz.lang.Lang;
 import org.nutz.lang.Strings;
 
-public class LinkedCharArray {
+public class LinkedCharArray implements Serializable {
+
+	private static final long serialVersionUID = 1L;
 
     public LinkedCharArray() {
         this(256);
@@ -98,10 +101,7 @@ public class LinkedCharArray {
 
     private void checkBound(int index) {
         if (index >= size() || index < 0)
-            throw new IndexOutOfBoundsException("Index: "
-                                                + index
-                                                + ", Size: "
-                                                + size());
+            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size());
     }
 
     public LinkedCharArray clear() {

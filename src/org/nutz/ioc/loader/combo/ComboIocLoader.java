@@ -1,5 +1,6 @@
 package org.nutz.ioc.loader.combo;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -23,6 +24,7 @@ import org.nutz.lang.Lang;
 import org.nutz.lang.Mirror;
 import org.nutz.lang.Strings;
 import org.nutz.lang.util.AbstractLifeCycle;
+import org.nutz.lang.util.Callback;
 import org.nutz.lang.util.LifeCycle;
 import org.nutz.log.Log;
 import org.nutz.log.Logs;
@@ -173,6 +175,33 @@ public class ComboIocLoader extends AbstractLifeCycle implements IocLoader {
        }
        return names;
     }
+    
+    public Set<String> getNamesByAnnotation(IocLoading loading, Class<? extends Annotation> klass) {
+        Set<String> names = new HashSet<String>();
+        for (IocLoader loader : iocLoaders) {
+            for (String name : loader.getName()) {
+                if (names.contains(name))
+                    continue;
+                try {
+                    IocObject iobj = loader.load(loading, name);
+                    if (iobj.getType() != null && iobj.getType().getAnnotation(klass) != null)
+                        names.add(name);
+                }
+                catch (ObjectLoadException e) {
+                    // nop
+                }
+            }
+        }
+        return names;
+     }
+    
+    public void each(IocLoading loading, Callback<IocObject> callback) throws ObjectLoadException {
+        for (IocLoader loader : iocLoaders) {
+            for (String name : loader.getName()) {
+                callback.invoke(loader.load(loading, name));
+            }
+        }
+    }
 
     public void addLoader(IocLoader loader) {
         if (null != loader) {
@@ -197,6 +226,17 @@ public class ComboIocLoader extends AbstractLifeCycle implements IocLoader {
             log.debugf("Found IocObject(%s) in %s", name, printName);
         }
     }
+    
+    public Class<?> getType(IocLoading loading, String beanName) throws ObjectLoadException {
+        for (IocLoader loader : iocLoaders) {
+            if (loader.has(beanName)) {
+                IocObject iobj = loader.load(loading, beanName);
+                if (iobj.getType() != null)
+                    return iobj.getType();
+            }
+        }
+        return null;
+     }
 
     /**
      * 类别名

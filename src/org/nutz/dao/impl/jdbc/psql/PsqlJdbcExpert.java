@@ -1,6 +1,12 @@
 package org.nutz.dao.impl.jdbc.psql;
 
 import java.sql.Blob;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.nutz.dao.DB;
@@ -11,7 +17,7 @@ import org.nutz.dao.entity.MappingField;
 import org.nutz.dao.entity.PkType;
 import org.nutz.dao.entity.annotation.ColType;
 import org.nutz.dao.impl.jdbc.AbstractJdbcExpert;
-import org.nutz.dao.impl.jdbc.BlobValueAdaptor2;
+import org.nutz.dao.impl.jdbc.BlobValueAdaptor3;
 import org.nutz.dao.jdbc.JdbcExpertConfigFile;
 import org.nutz.dao.jdbc.Jdbcs;
 import org.nutz.dao.jdbc.ValueAdaptor;
@@ -20,8 +26,12 @@ import org.nutz.dao.sql.Pojo;
 import org.nutz.dao.sql.Sql;
 import org.nutz.dao.util.Pojos;
 import org.nutz.lang.Lang;
+import org.nutz.log.Log;
+import org.nutz.log.Logs;
 
 public class PsqlJdbcExpert extends AbstractJdbcExpert {
+
+    private static final Log log = Logs.get();
 
     public PsqlJdbcExpert(JdbcExpertConfigFile conf) {
         super(conf);
@@ -128,7 +138,7 @@ public class PsqlJdbcExpert extends AbstractJdbcExpert {
                 return "NUMERIC(" + mf.getWidth() + "," + mf.getPrecision() + ")";
             }
             // 用默认精度
-            if (mf.getTypeMirror().isDouble())
+            if (mf.getMirror().isDouble())
                 return "NUMERIC(15,10)";
             return "NUMERIC";
 
@@ -156,8 +166,8 @@ public class PsqlJdbcExpert extends AbstractJdbcExpert {
 
     @Override
     public ValueAdaptor getAdaptor(MappingField ef) {
-        if (ef.getTypeMirror().isOf(Blob.class)) {
-            return new BlobValueAdaptor2(Jdbcs.getFilePool());
+        if (ef.getMirror().isOf(Blob.class)) {
+            return new BlobValueAdaptor3(Jdbcs.getFilePool());
         } else if (ColType.PSQL_JSON == ef.getColumnType()) {
             return new PsqlJsonAdaptor();
         } else if (ColType.PSQL_ARRAY == ef.getColumnType()) {
@@ -166,10 +176,64 @@ public class PsqlJdbcExpert extends AbstractJdbcExpert {
             return super.getAdaptor(ef);
         }
     }
-    
-    public String wrapKeywork(String columnName, boolean force) {
+
+    public String wrapKeyword(String columnName, boolean force) {
         if (force || keywords.contains(columnName.toUpperCase()))
             return "\"" + columnName + "\"";
         return null;
+    }
+
+    @Override
+    public void checkDataSource(Connection conn) throws SQLException {
+        if (log.isDebugEnabled()) {
+            String sql = "SELECT * FROM information_schema.character_sets";
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            if (rs.next()) {
+                for (String name : Arrays.asList("character_set_catalog",
+                                                 "character_set_schema",
+                                                 "character_set_name",
+                                                 "character_repertoire",
+                                                 "form_of_use",
+                                                 "default_collate_catalog",
+                                                 "default_collate_schema",
+                                                 "default_collate_name")) {
+                    log.debugf("Postgresql : %s=%s", name, rs.getString(name));
+                }
+            }
+            rs.close();
+            // 打印当前数据库名称
+            rs = stmt.executeQuery("SELECT CURRENT_DATABASE()");
+            if (rs.next()) {
+                log.debug("Postgresql : database=" + rs.getString(1));
+            }
+            rs.close();
+            // 打印当前连接用户名
+            rs = stmt.executeQuery("SELECT CURRENT_USER");
+            if (rs.next()) {
+                log.debug("Postgresql : user=" + rs.getString(1));
+            }
+            rs.close();
+            stmt.close();
+        }
+    }
+
+    /**
+     * @author enzozhong( haowen.zhong@foxmail.com )
+     */
+    @Override
+    public List<String> getIndexNames(Entity<?> en, Connection conn) throws SQLException {
+
+        String tableName = en.getTableName();
+        String sql = "SELECT * FROM pg_indexes WHERE tablename='" + tableName + "'";
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery(sql);
+
+        ArrayList<String> indexNames = new ArrayList<String>(17);
+        while (rs.next()) {
+            indexNames.add(rs.getString("indexname"));
+        }
+
+        return indexNames;
     }
 }

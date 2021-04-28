@@ -104,12 +104,16 @@ public interface NutBean extends Map<String, Object> {
     NutBean addv(String key, Object value);
 
     NutBean addv2(String key, Object value);
+    
+    NutBean addv3(String key, Object value);
 
     NutBean setv(String key, Object value);
 
     void unset(String key);
 
     NutBean setAll(Map<String, Object> map);
+
+    Object getFallback(String... keys);
 
     /**
      * 从 Map 里挑选一些键生成一个新的 Map
@@ -159,6 +163,17 @@ public interface NutBean extends Map<String, Object> {
      * @return 新 Map
      */
     NutBean pickAndRemoveBy(Pattern p, boolean isNot);
+
+    /**
+     * 就是 pickAndRemoveBy 的一个便利写法
+     * 
+     * @param regex
+     *            正则表达式，! 开头表示取反
+     * @return 新 Map
+     * 
+     * @see #pickAndRemoveBy(Pattern, boolean)
+     */
+    NutMap pickAndRemoveBy(String regex);
 
     /**
      * 从 Map 里将指定的键过滤，生成一个新的 Map
@@ -221,6 +236,23 @@ public interface NutBean extends Map<String, Object> {
      * @see #setnx(String, Object)
      */
     NutBean setnxAll(Map<String, Object> map);
+
+    /**
+     * @param key
+     *            键，支持用 <code>|</code> 分隔，如果一个值为空，则继续寻找下一个候选键。 其中，支持 "."
+     *            作为层级路径分隔
+     * @param dft
+     *            都没有找到时返回的默认值
+     * @return 值
+     */
+    Object getOr(String key, Object dft);
+    
+    Object getOrBy(String[] keys, Object dft);
+
+    /**
+     * @see #getOr(String, Object)
+     */
+    Object getOr(String key);
 
     /**
      * 获取对应的值,若不存在,用factory创建一个,然后设置进去,返回之

@@ -15,11 +15,13 @@ import org.nutz.lang.Encoding;
 import org.nutz.lang.ExitLoop;
 import org.nutz.lang.Lang;
 import org.nutz.lang.LoopException;
+import org.nutz.lang.util.NutMap;
+import org.nutz.repo.Base64;
 
 public class Request {
 
     public static enum METHOD {
-        GET, POST, OPTIONS, PUT, DELETE, TRACE, CONNECT, HEAD
+        GET, POST, OPTIONS, PUT, PATCH, DELETE, TRACE, CONNECT, HEAD
     }
 
     public static Request get(String url) {
@@ -42,14 +44,12 @@ public class Request {
         return create(url, method, new HashMap<String, Object>());
     }
 
-    @SuppressWarnings("unchecked")
     public static Request create(String url, METHOD method, String paramsAsJson, Header header) {
-        return create(url, method, (Map<String, Object>) Json.fromJson(paramsAsJson), header);
+        return create(url, method, Json.fromJson(NutMap.class, paramsAsJson), header);
     }
 
-    @SuppressWarnings("unchecked")
     public static Request create(String url, METHOD method, String paramsAsJson) {
-        return create(url, method, (Map<String, Object>) Json.fromJson(paramsAsJson));
+        return create(url, method, Json.fromJson(NutMap.class, paramsAsJson));
     }
 
     public static Request create(String url, METHOD method, Map<String, Object> params) {
@@ -89,7 +89,7 @@ public class Request {
         StringBuilder sb = new StringBuilder(url);
         try {
             if (this.isGet() && null != params && params.size() > 0) {
-                sb.append(url.indexOf('?') > 0 ? '&' : '?');
+                sb.append(url.indexOf('?') >= 0 ? '&' : '?');
                 sb.append(getURLEncodedParams());
             }
             cacheUrl = new URL(sb.toString());
@@ -113,6 +113,7 @@ public class Request {
                 if (val == null)
                     val = "";
                 Lang.each(val, new Each<Object>() {
+                    @Override
                     public void invoke(int index, Object ele, int length)
                             throws ExitLoop, ContinueLoop, LoopException {
                         if (offEncode) {
@@ -266,5 +267,15 @@ public class Request {
 
     public String getMethodString() {
         return methodString;
+    }
+
+    public Request basicAuth(String user, String password) {
+        header("Authorization",
+               "Basic " + Base64.encodeToString((user + ":" + password).getBytes(), false));
+        return this;
+    }
+
+    public boolean hasInputStream() {
+        return inputStream != null;
     }
 }

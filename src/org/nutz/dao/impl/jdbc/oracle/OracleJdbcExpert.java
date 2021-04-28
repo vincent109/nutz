@@ -4,6 +4,7 @@ import org.nutz.dao.DB;
 import org.nutz.dao.Dao;
 import org.nutz.dao.Sqls;
 import org.nutz.dao.entity.Entity;
+import org.nutz.dao.entity.LinkField;
 import org.nutz.dao.entity.MappingField;
 import org.nutz.dao.entity.PkType;
 import org.nutz.dao.entity.annotation.ColType;
@@ -14,10 +15,12 @@ import org.nutz.dao.jdbc.JdbcExpertConfigFile;
 import org.nutz.dao.jdbc.Jdbcs;
 import org.nutz.dao.jdbc.ValueAdaptor;
 import org.nutz.dao.pager.Pager;
+import org.nutz.dao.sql.PItem;
 import org.nutz.dao.sql.Pojo;
 import org.nutz.dao.sql.Sql;
 import org.nutz.dao.util.Pojos;
 import org.nutz.lang.Mirror;
+import org.nutz.lang.util.NutMap;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -54,13 +57,14 @@ public class OracleJdbcExpert extends AbstractJdbcExpert {
                                  + " END IF;"
                                  + " END ${T}_${F}_ST;";
 
+    protected boolean ignoreOneRowPager;
 
     public OracleJdbcExpert(JdbcExpertConfigFile conf) {
         super(conf);
     }
 
     public ValueAdaptor getAdaptor(MappingField ef) {
-        Mirror<?> mirror = ef.getTypeMirror();
+        Mirror<?> mirror = ef.getMirror();
         if (mirror.isBoolean())
             return new OracleBooleanAdaptor();
         if (mirror.isOf(Clob.class))
@@ -163,6 +167,8 @@ public class OracleJdbcExpert extends AbstractJdbcExpert {
         Pager pager = pojo.getContext().getPager();
         // 需要进行分页
         if (null != pager && pager.getPageNumber() > 0) {
+            if (ignoreOneRowPager && pager.getPageNumber() == 1 && pager.getPageSize() == 1)
+                return;
             pojo.insertFirst(Pojos.Items.wrap("SELECT * FROM (SELECT T.*, ROWNUM RN FROM ("));
             pojo.append(Pojos.Items.wrapf(") T WHERE ROWNUM <= %d) WHERE RN > %d",
                                           pager.getOffset() + pager.getPageSize(),
@@ -175,6 +181,8 @@ public class OracleJdbcExpert extends AbstractJdbcExpert {
         Pager pager = sql.getContext().getPager();
         // 需要进行分页
         if (null != pager && pager.getPageNumber() > 0) {
+            if (ignoreOneRowPager && pager.getPageNumber() == 1 && pager.getPageSize() == 1)
+                return;
             String pre = "SELECT * FROM (SELECT T.*, ROWNUM RN FROM (";
             String last = String.format(") T WHERE ROWNUM <= %d) WHERE RN > %d",
                                         pager.getOffset() + pager.getPageSize(),
@@ -212,7 +220,7 @@ public class OracleJdbcExpert extends AbstractJdbcExpert {
                 return "NUMBER(" + mf.getWidth() + "," + mf.getPrecision() + ")";
             }
             // 用默认精度
-            if (mf.getTypeMirror().isDouble())
+            if (mf.getMirror().isDouble())
                 return "NUMBER(15,10)";
             return "NUMBER";
         case TIME:
@@ -262,7 +270,7 @@ public class OracleJdbcExpert extends AbstractJdbcExpert {
         return false;
     }
     
-    public String wrapKeywork(String columnName, boolean force) {
+    public String wrapKeyword(String columnName, boolean force) {
         if (force || keywords.contains(columnName.toUpperCase()))
             return "\"" + columnName + "\"";
         return null;
@@ -279,5 +287,24 @@ public class OracleJdbcExpert extends AbstractJdbcExpert {
             names.add(index);
         }
         return names;
+    }
+
+    public void setupProperties(NutMap conf) {
+        super.setupProperties(conf);
+        this.ignoreOneRowPager = conf.getBoolean("nutz.dao.jdbc.oracle.ignoreOneRowPager", false);
+    }
+    
+    @Override
+    public PItem formatLeftJoinLink(Object obj, LinkField lnk, Entity<?> en) {
+    	Entity<?> lnkEntity = lnk.getLinkedEntity();
+        String linkName = safeTableName(lnk.getName());
+        String LJ = String.format("LEFT JOIN %s %s ON %s.%s = %s.%s",
+                                  lnkEntity.getTableName(),
+                                  linkName,
+                                  en.getTableName(),
+                                  lnk.getHostField().getColumnNameInSql(),
+                                  linkName,
+                                  lnk.getLinkedField().getColumnNameInSql());
+    	return Pojos.Items.wrap(LJ);
     }
 }

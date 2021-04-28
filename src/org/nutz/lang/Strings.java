@@ -1559,11 +1559,11 @@ public class Strings {
     }
 
     public static Pattern P_CitizenId = Pattern.compile("[1-9]\\d{5}[1-2]\\d{3}((0\\d)|(1[0-2]))(([0|1|2]\\d)|3[0-1])\\d{3}(\\d|X|x)");
-    public static Pattern P_Mobile = Pattern.compile("^((13[0-9])|(15[0-9])|(14[0-9])|(17[0-9])|(18[0-9]))\\d{8}$");
+    public static Pattern P_Mobile = Pattern.compile("^((13[0-9])|(15[0-9])|(14[0-9])|(16[0-9])|(19[0-9])|(17[0-9])|(18[0-9]))\\d{8}$");
     public static Pattern P_ZipCode = Pattern.compile("\\d{6}");
     public static Pattern P_Money = Pattern.compile("^(\\d+(?:\\.\\d+)?)$");
     public static Pattern P_Number = Pattern.compile("^[\\d]+$");
-    public static Pattern P_Email = Pattern.compile("^([a-zA-Z0-9]*[-_]?[\\w.]+)*@([a-zA-Z0-9]*[-_]?[a-zA-Z0-9]+)+[\\\\.][A-Za-z]{2,3}([\\\\.][A-Za-z]{2})?$");
+    public static Pattern P_Email = Pattern.compile("^[.\\d\\w_-]+@[\\d\\w_-]+(\\.[\\d\\w]+)+$");
     public static Pattern P_QQ = Pattern.compile("[1-9][0-9]{4,10}");
     public static Pattern P_USCC = Pattern.compile("^(11|12|13|19|51|52|53|59|91|92|93|Y1)[1-9]{1}[0-9]{5}[0-9A-HJ-NP-RT-UW-Y0-9]{9}[0-90-9A-HJ-NP-RT-UW-Y]{1}$");
     public static Pattern P_UnionPayCard = Pattern.compile("^62[0-5]\\d{13,16}$");
@@ -1749,7 +1749,7 @@ public class Strings {
      * <p>
      * 比如:
      * <ul>
-     * <li>removeLast("12345",5) => "12345"
+     * <li>removeLast("12345",'5') => "1234"
      * <li>removeLast("ABC",'B') => "ABC"
      * <li>removeLast("A",'B') => "A"
      * <li>removeLast("A",'A') => ""

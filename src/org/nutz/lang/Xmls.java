@@ -24,6 +24,7 @@ import javax.xml.xpath.XPathFactory;
 
 import org.nutz.lang.util.Callback2;
 import org.nutz.lang.util.NutMap;
+import org.nutz.lang.util.Regex;
 import org.nutz.lang.util.Tag;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -47,7 +48,40 @@ public abstract class Xmls {
      * @throws ParserConfigurationException
      */
     public static DocumentBuilder xmls() throws ParserConfigurationException {
-        return DocumentBuilderFactory.newInstance().newDocumentBuilder();
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        String FEATURE = null;
+        
+        // This is the PRIMARY defense. If DTDs (doctypes) are disallowed, almost all XML entity attacks are prevented
+        // Xerces 2 only - http://xerces.apache.org/xerces2-j/features.html#disallow-doctype-decl
+
+        FEATURE = "http://apache.org/xml/features/disallow-doctype-decl";
+        dbf.setFeature(FEATURE, true);
+
+        // If you can't completely disable DTDs, then at least do the following:
+        // Xerces 1 - http://xerces.apache.org/xerces-j/features.html#external-general-entities
+
+        // Xerces 2 - http://xerces.apache.org/xerces2-j/features.html#external-general-entities
+
+        // JDK7+ - http://xml.org/sax/features/external-general-entities 
+        FEATURE = "http://xml.org/sax/features/external-general-entities";
+        dbf.setFeature(FEATURE, false);
+
+        // Xerces 1 - http://xerces.apache.org/xerces-j/features.html#external-parameter-entities
+
+        // Xerces 2 - http://xerces.apache.org/xerces2-j/features.html#external-parameter-entities
+
+        // JDK7+ - http://xml.org/sax/features/external-parameter-entities 
+        FEATURE = "http://xml.org/sax/features/external-parameter-entities";
+        dbf.setFeature(FEATURE, false);
+
+        // Disable external DTDs as well
+        FEATURE = "http://apache.org/xml/features/nonvalidating/load-external-dtd";
+        dbf.setFeature(FEATURE, false);
+
+        // and these as well, per Timothy Morgan's 2014 paper: "XML Schema, DTD, and Entity Attacks"
+        dbf.setXIncludeAware(false);
+        dbf.setExpandEntityReferences(false);
+        return dbf.newDocumentBuilder();
     }
     
     public static Document xml(InputStream ins) {
@@ -356,7 +390,7 @@ public abstract class Xmls {
             if (nd instanceof Element) {
                 if (null == regex)
                     return false;
-                if (((Element) nd).getTagName().matches(regex))
+                if (Regex.match(regex, ((Element) nd).getTagName()))
                     return true;
             }
         }
@@ -493,19 +527,28 @@ public abstract class Xmls {
         return asMap(ele, lowFirst, dupAsList, null);
     }
     public static NutMap asMap(Element ele, final boolean lowerFirst, final boolean dupAsList, final List<String> alwaysAsList) {
+        return asMap(ele, new XmlParserOpts(lowerFirst, dupAsList, alwaysAsList, false));
+    }
+    public static NutMap asMap(Element ele, final XmlParserOpts opts) {
         final NutMap map = new NutMap();
+        if (opts.isAttrAsKeyValue()) {
+            NamedNodeMap attrs = ele.getAttributes();
+            for (int i = 0; i < attrs.getLength(); i++) {
+                map.put(attrs.item(i).getNodeName(), attrs.item(i).getNodeValue());
+            }
+        }
         eachChildren(ele, new Each<Element>() {
             public void invoke(int index, Element _ele, int length)
                     throws ExitLoop, ContinueLoop, LoopException {
                 String key = _ele.getNodeName();
-                if (lowerFirst)
+                if (opts.lowerFirst)
                     key = Strings.lowerFirst(key);
-                Map<String, Object> tmp = asMap(_ele, lowerFirst, dupAsList, alwaysAsList);
+                Map<String, Object> tmp = asMap(_ele, opts);
                 if (!tmp.isEmpty()) {
-                    if (alwaysAsList != null && alwaysAsList.contains(key)) {
+                    if (opts.alwaysAsList != null && opts.alwaysAsList.contains(key)) {
                         map.addv2(key, tmp);
                     }
-                    else if (dupAsList) {
+                    else if (opts.dupAsList) {
                         map.addv(key, tmp);
                     }
                     else {
@@ -514,11 +557,11 @@ public abstract class Xmls {
                     return;
                 }
                 String val = getText(_ele);
-                if (!Strings.isBlank(val)) {
-                    if (alwaysAsList != null && alwaysAsList.contains(key)) {
-                        map.addv2(key, map);
+                if (opts.keeyBlankNode || !Strings.isBlank(val)) {
+                    if (opts.alwaysAsList != null && opts.alwaysAsList.contains(key)) {
+                        map.addv2(key, val);
                     }
-                    else if (dupAsList)
+                    else if (opts.dupAsList)
                         map.addv(key, val);
                     else
                         map.setv(key, val);
@@ -644,4 +687,60 @@ public abstract class Xmls {
     }
     
     public static String HEAD = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
+    
+    public static class XmlParserOpts {
+        private boolean lowerFirst;
+        private boolean dupAsList;
+        private List<String> alwaysAsList;
+        private boolean keeyBlankNode;
+        private boolean attrAsKeyValue;
+        public XmlParserOpts() {
+        }
+        
+        
+        public XmlParserOpts(boolean lowerFirst, boolean dupAsList, List<String> alwaysAsList, boolean keeyBlankNode) {
+            super();
+            this.lowerFirst = lowerFirst;
+            this.dupAsList = dupAsList;
+            this.alwaysAsList = alwaysAsList;
+            this.keeyBlankNode = keeyBlankNode;
+        }
+
+
+        public boolean isLowerFirst() {
+            return lowerFirst;
+        }
+        public void setLowerFirst(boolean lowerFirst) {
+            this.lowerFirst = lowerFirst;
+        }
+        public boolean isDupAsList() {
+            return dupAsList;
+        }
+        public void setDupAsList(boolean dupAsList) {
+            this.dupAsList = dupAsList;
+        }
+        public List<String> getAlwaysAsList() {
+            return alwaysAsList;
+        }
+        public void setAlwaysAsList(List<String> alwaysAsList) {
+            this.alwaysAsList = alwaysAsList;
+        }
+        public boolean isKeeyBlankNode() {
+            return keeyBlankNode;
+        }
+        public void setKeeyBlankNode(boolean keeyBlankNode) {
+            this.keeyBlankNode = keeyBlankNode;
+        }
+
+
+        public boolean isAttrAsKeyValue() {
+            return attrAsKeyValue;
+        }
+
+
+        public void setAttrAsKeyValue(boolean attrAsKeyValue) {
+            this.attrAsKeyValue = attrAsKeyValue;
+        }
+        
+    }
 }

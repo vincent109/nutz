@@ -2,6 +2,7 @@ package org.nutz.mapl.impl.convert;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
+import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -34,11 +35,11 @@ import org.nutz.mapl.MaplConvert;
 public class ObjConvertImpl implements MaplConvert {
 
     // 路径
-    Stack<String> path = new Stack<String>();
+    protected Stack<String> path = new Stack<String>();
     // 对象缓存
-    Context context;
+    protected Context context;
 
-    private Type type;
+    protected Type type;
 
     public ObjConvertImpl(Type type) {
         this.type = type;
@@ -64,14 +65,14 @@ public class ObjConvertImpl implements MaplConvert {
         if (type == null)
             return model;
         // obj是基本数据类型或String
-        if (!(model instanceof Map) && !(model instanceof List)) {
+        if (!(model instanceof Map) && !(model instanceof Iterable)) {
             return Castors.me().castTo(model, Lang.getTypeClass(type));
         }
 
         return inject(model, type);
     }
 
-    Object inject(Object model, Type type) {
+    public Object inject(Object model, Type type) {
         if (model == null) {
             return null;
         }
@@ -234,6 +235,14 @@ public class ObjConvertImpl implements MaplConvert {
                     }
                 } else {
                     path.push(key);
+                }
+            }
+            // fix issue 1386
+            if (jef.getMirror().isDateTimeLike() && jef.getDataFormat() != null) {
+                try {
+                    jef.setValue(obj, ((DateFormat)jef.getDataFormat()).parse(String.valueOf(val)));
+                    continue;
+                } catch (Throwable e) {
                 }
             }
             jef.setValue(obj, Mapl.maplistToObj(val, jef.getGenericType()));
